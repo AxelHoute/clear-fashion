@@ -26,7 +26,10 @@ const selectShow = document.querySelector('#show-select');
 const selectPage = document.querySelector('#page-select');
 const sectionProducts = document.querySelector('#products');
 const spanNbProducts = document.querySelector('#nbProducts');
-
+const selectBrand=document.querySelector("#brand-select");
+const reasonablePrice = document.querySelector("#reasonable-price");
+const recentlyReleased = document.querySelector("#recently-released");
+const sortproduct = document.querySelector("#sort-select");
 /**
  * Set global value
  * @param {Array} result - products to display
@@ -42,11 +45,12 @@ const setCurrentProducts = ({result, meta}) => {
  * @param  {Number}  [page=1] - current page to fetch
  * @param  {Number}  [size=12] - size of the page
  * @return {Object}
+ * 
  */
-const fetchProducts = async (page = 1, size = 12) => {
+const fetchProducts = async (page = 1, size = 12,brand="all",filtre_recent=false,filtre_prix=false,sort_type="price-asc") => {
   try {
     const response = await fetch(
-      `https://clear-fashion-api.vercel.app?page=${page}&size=${size}`
+      `https://clear-fashion-api.vercel.app?&size=999`+ (brand !== "all" ? `&brand=${brand}` : "")
     );
     const body = await response.json();
 
@@ -54,14 +58,73 @@ const fetchProducts = async (page = 1, size = 12) => {
       console.error(body);
       return {currentProducts, currentPagination};
     }
-
-    return body.data;
+    var result=body.data.result;
+    console.log(Array.isArray(result));
+    if (filtre_recent){
+      result = result.filter(product => (new Date() - new Date(product.released)) / (1000 * 60 * 60 * 24) < 50);
+    }
+    if (filtre_prix){  
+      result=result.filtre(product=>product.price<50);
+    }
+    var meta = {
+      currentPage: page,
+      pageCount: Math.ceil(result.length / size),
+      pageSize: size,
+      count: result.length
+    };
+    result=Sort(sort_type,result);
+    return {result,meta};
   } catch (error) {
     console.error(error);
     return {currentProducts, currentPagination};
   }
 };
 
+/**
+ * Les sort sous forme de fonctions.
+ */
+function Sort(sort_type,result){
+  if(sort_type === "price-asc") {
+    result.sort((a, b) => a.price - b.price);
+  }
+  else if(sort_type === "price-desc") {
+    result.sort((a, b) => b.price - a.price);
+  }
+  else if(sort_type === "date-asc") {
+    result.sort((a, b) => new Date(b.released) - new Date(a.released));
+  }
+  else if(sort_type === "date-desc") {
+    result.sort((a, b) => new Date(a.released) - new Date(b.released));
+  }
+  return(result);
+}
+
+
+/**
+ * fetch brand 
+ * @return {Array} brands
+ */
+const fetchBrand = async ()=> {
+  try {
+    const response = await fetch(
+      'https://clear-fashion-api.vercel.app/brands'
+    );
+    const body = await response.json();
+
+    if (body.success !== true) {
+      console.error(body);
+    }
+    else {
+      var brands=body.data.result;
+      brands.unshift("all")
+      renderBrands(brands) 
+    }
+    return body.data;
+  } catch (error) {
+    console.error(error);
+ 
+  }
+};
 /**
  * Render list of products
  * @param  {Array} products
@@ -102,6 +165,8 @@ const renderPagination = pagination => {
   selectPage.selectedIndex = currentPage - 1;
 };
 
+
+
 /**
  * Render page selector
  * @param  {Object} pagination
@@ -112,10 +177,22 @@ const renderIndicators = pagination => {
   spanNbProducts.innerHTML = count;
 };
 
+/**
+ * Render brand selector
+ * @param  {Array} brands
+ 
+ */
+const renderBrands = brands => {
+  const options = brands.map(brand => `<option value="${brand}">${brand}</option>`).join('');
+
+  selectBrand.innerHTML = options;
+};
 const render = (products, pagination) => {
   renderProducts(products);
   renderPagination(pagination);
   renderIndicators(pagination);
+  renderBrands(brand);
+  
 };
 
 /**
@@ -126,15 +203,49 @@ const render = (products, pagination) => {
  * Select the number of products to display
  */
 selectShow.addEventListener('change', async (event) => {
-  const products = await fetchProducts(currentPagination.currentPage, parseInt(event.target.value));
+  const products = await fetchProducts(currentPagination.currentPage, parseInt(event.target.value),selectBrand.value);
 
   setCurrentProducts(products);
   render(currentProducts, currentPagination);
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const products = await fetchProducts();
+  const products = await fetchProducts(currentPagination.currentPage,);
 
+  setCurrentProducts(products);
+  render(currentProducts, currentPagination);
+});
+
+
+selectPage.addEventListener('change',async (event) =>{
+  const products= await fetchProducts(parseInt(event.target.value),currentPagination.pageCount,selectBrand.value,recentlyReleased.checked,reasonablePrice.checked,sortproduct);
+  setCurrentProducts(products);
+  render(currentProducts, currentPagination);
+});
+
+selectBrand.addEventListener('change',async (event)=>{
+  const products=await fetchProducts(currentPagination.currentPage,currentPagination.pageCount,event.target.value,recentlyReleased.checked,reasonablePrice.checked,sortproduct);
+  setCurrentProducts(products);
+  render(currentProducts, currentPagination);
+});
+
+fetchBrand();
+
+if (reasonablePrice){
+  reasonablePrice.addEventListener('change',async (event)=>{
+  const products=await fetchProducts(currentPagination.currentPage,currentPagination.pageCount,selectBrand.value,recentlyReleased.checked,event.target.checked,sortproduct);
+  setCurrentProducts(products);
+  render(currentProducts, currentPagination);
+});}
+if (recentlyReleased){
+  recentlyReleased.addEventListener('change',async (event)=>{
+  const products=await fetchProducts(currentPagination.currentPage,currentPagination.pageCount,selectBrand.value,event.target.checked,reasonablePrice.checked,sortproduct);
+  setCurrentProducts(products);
+  render(currentProducts, currentPagination);
+});}
+
+sortproduct.addEventListener('change',async (event)=>{
+  const products=await fetchProducts(currentPagination.currentPage,currentPagination.pageCount,selectBrand.value,recentlyReleased.checked,reasonablePrice.checked,event.target.value);
   setCurrentProducts(products);
   render(currentProducts, currentPagination);
 });
