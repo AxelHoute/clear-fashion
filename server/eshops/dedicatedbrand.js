@@ -1,52 +1,36 @@
 const fetch = require('node-fetch');
 const cheerio = require('cheerio');
+const fs = require('fs');
 
-/**
- * Parse webpage e-shop
- * @param  {String} data - html response
- * @return {Array} products
- */
-const parse = data => {
-  const $ = cheerio.load(data);
 
-  return $('.productList-container .productList')
-    .map((i, element) => {
-      const name = $(element)
-        .find('.productList-title')
-        .text()
-        .trim()
-        .replace(/\s/g, ' ');
-      const price = parseInt(
-        $(element)
-          .find('.productList-price')
-          .text()
+module.exports.scrapeAndSave = async(url, filename) =>{
+
+  try{ 
+    const response = await fetch ("https://www.dedicatedbrand.com/en/loadfilter");
+    if (response.ok){
+      const body =await response.json();
+      const products = body['products'].filter(
+        data => Object.keys(data).length >0
       );
+      data_json =products.map(
+        function(data){
+          const img= data['image'][0];
+          const brandName = 'Dedicated';
+          const link = "https://www.dedicatedbrand.com/en/"+ data['canonicalUri'];
+          const name =data['name'];
+          const price =data.price.priceAsNumber;
+          let date = new Date().toISOString().slice(0, 10);
+          return{name, link, img, price, date,brandName};
+        }
+      );
+       fs.writeFileSync('server/dedicatedproducts.json', JSON.stringify(data_json,null , 2));
 
-      return {name, price};
-    })
-    .get();
-};
-
-/**
- * Scrape all the products for a given url page
- * @param  {[type]}  url
- * @return {Array|null}
- */
-module.exports.scrape = async url => {
-  try {
-    const response = await fetch(url);
-
-    if (response.ok) {
-      const body = await response.text();
-
-      return parse(body);
+       return data_json;
     }
-
     console.error(response);
-
     return null;
-  } catch (error) {
+  } catch(error){
     console.error(error);
     return null;
   }
-};
+}
