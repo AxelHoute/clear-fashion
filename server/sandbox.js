@@ -17,7 +17,7 @@ async function sandbox (eshop) {
   }
 
   if (eshop=="montelimart"){
-    const products = await monterlimart.scrapeAndSave(['https://www.montlimart.com/99-vetements','https://www.montlimart.com/14-chaussures','https://www.montlimart.com/15-accessoires'],'server/montelimart.json');
+    const products = await monterlimart.scrapeAndSave('https://www.montlimart.com/','server/montelimart.json');
 
     console.log(products);
     console.log('done');
